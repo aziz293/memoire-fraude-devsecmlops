@@ -39,10 +39,14 @@ def test_predict_malformed_data():
 
 def test_drift_detection_logic():
     # On importe la logique de drift ici pour augmenter le coverage de ce fichier
-    from src.drift_detection import detect_drift
+    from src.drift_detection import run_drift_report
     import pandas as pd
     import numpy as np
     
+def test_predict_empty_payload():
+    r = client.post("/predict", json={}, headers=HEADERS)
+    assert r.status_code == 422 # Pydantic doit rejeter un body vide
+
     # Création de données fictives (référence vs actuel)
     ref = pd.DataFrame(np.random.randn(100, 29))
     curr = pd.DataFrame(np.random.randn(100, 29) + 5) # On ajoute un décalage (drift)
