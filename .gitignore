@@ -1,0 +1,18 @@
+# Environnements virtuels (partout dans le projet)
+venv/
+**/venv/
+.venv/
+**/.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Système
+.DS_Store
+
+# Données et Modèles (Gérés par DVC)
+data/
+# IMPORTANT : On ignore le .pkl car il est sur DagsHub
+artifacts/fraud_model.pkl
+artifacts/reference_data.csv

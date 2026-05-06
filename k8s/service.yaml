@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-detector-service
+  namespace: mlops # Très important, doit être le même que le déploiement
+spec:
+  selector:
+    app: fraud-detector # Doit correspondre exactement au label du deployment.yaml
+  ports:
+    - protocol: TCP
+      port: 80         # Port sur lequel le service sera accessible (ex: http://mon-service)
+      targetPort: 8080 # Le port que ton application écoute dans le conteneur
+  type: ClusterIP      # Utilise "NodePort" si tu veux y accéder depuis l'IP de Minikube 
