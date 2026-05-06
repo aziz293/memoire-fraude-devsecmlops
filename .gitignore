@@ -16,3 +16,5 @@ data/
 # IMPORTANT : On ignore le .pkl car il est sur DagsHub
 artifacts/fraud_model.pkl
 artifacts/reference_data.csv
+
+venv/
