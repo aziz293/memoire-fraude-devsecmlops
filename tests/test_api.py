@@ -52,6 +52,6 @@ def test_predict_empty_payload():
     ref = pd.DataFrame(np.random.randn(100, 29))
     curr = pd.DataFrame(np.random.randn(100, 29) + 5) # On ajoute un décalage (drift)
     
-    drift_report = detect_drift(ref, curr)
+    drift_report = run_drift_report(ref, curr)
     assert "drift_detected" in drift_report
     assert isinstance(drift_report["drift_detected"], bool)
