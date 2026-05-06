@@ -1,8 +1,10 @@
-from fastapi.testclient import TestClient
-from src.api import app
 import os
 
 os.environ["API_TOKEN"] = "test-token"
+
+from fastapi.testclient import TestClient
+from src.api import app
+
 client = TestClient(app)
 HEADERS = {"Authorization": "Bearer test-token"}
 
