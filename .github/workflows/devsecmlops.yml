@@ -40,7 +40,7 @@ jobs:
           name: bandit-report
           path: bandit-report.json
 
-  # ── JOB 2 : Tests unitaires ───────────────────────────────
+# ── JOB 2 : Tests unitaires ───────────────────────────────
   tests:
     name: Unit Tests + Coverage
     runs-on: ubuntu-latest
@@ -68,13 +68,15 @@ jobs:
       - name: Run tests with coverage
         env:
           API_TOKEN: ${{ secrets.API_TOKEN }}
-        run: pytest tests/ -v --cov=src --cov-report=xml --cov-fail-under=70
+          PYTHONPATH: ${{ github.workspace }}  # <--- CRUCIAL : Définit la racine pour trouver 'src'
+        run: |
+          touch src/__init__.py # <--- Sécurité : garantit que src est un module
+          pytest tests/ -v --cov=src --cov-report=xml --cov-fail-under=70
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
-          file: coverage.xml
-
+          file: ./coverage.xml
   # ── JOB 3 : Build + Scan + Push Docker ───────────────────
   docker-build-push:
     name: Docker Build · Trivy Scan · Push
