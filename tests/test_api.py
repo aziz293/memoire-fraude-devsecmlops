@@ -1,13 +1,16 @@
 import os
 import pandas as pd
 import numpy as np
-os.environ["API_TOKEN"] = "test-token"
-
 from fastapi.testclient import TestClient
+
+# 1. Configurer l'environnement AVANT l'import de l'app
+os.environ["API_TOKEN"] = "test-token"
 from src.api import app
 
 client = TestClient(app)
 HEADERS = {"Authorization": "Bearer test-token"}
+
+# --- Tests de l'API ---
 
 def test_health():
     r = client.get("/health")
@@ -22,36 +25,44 @@ def test_predict_valid():
     assert r.json()["decision"] in ["fraud", "legitimate"]
 
 def test_predict_invalid_features():
-    payload = {"features": [0.0] * 10}  # Mauvais nombre de features
+    payload = {"features": [0.0] * 10}
     r = client.post("/predict", json=payload, headers=HEADERS)
     assert r.status_code == 422
 
 def test_predict_no_token():
     payload = {"features": [0.0] * 29}
-    r = client.post("/predict", json=payload)  # Sans token
+    r = client.post("/predict", json=payload)
     assert r.status_code == 401
 
-
 def test_predict_malformed_data():
-    # Test avec des chaînes de caractères au lieu de nombres
     payload = {"features": ["invalid"] * 29}
     r = client.post("/predict", json=payload, headers=HEADERS)
-    assert r.status_code == 422 # Erreur de validation Pydantic
+    assert r.status_code == 422
 
-def test_drift_detection_logic():
-    # On importe la logique de drift ici pour augmenter le coverage de ce fichier
-    from src.drift_detection import run_drift_report
-    import pandas as pd
-    import numpy as np
-    
 def test_predict_empty_payload():
     r = client.post("/predict", json={}, headers=HEADERS)
-    assert r.status_code == 422 # Pydantic doit rejeter un body vide
+    assert r.status_code == 422
 
-    # Création de données fictives (référence vs actuel)
-    ref = pd.DataFrame(np.random.randn(100, 29))
-    curr = pd.DataFrame(np.random.randn(100, 29) + 5) # On ajoute un décalage (drift)
+# --- Test de la logique de Drift ---
+
+def test_drift_detection_logic():
+    from src.drift_detection import run_drift_report
     
-    drift_report = run_drift_report(ref, curr)
-    assert "drift_detected" in drift_report
-    assert isinstance(drift_report["drift_detected"], bool)
+    # Création de colonnes nommées pour correspondre à ce qu'Evidently attend
+    cols = [f"col_{i}" for i in range(29)]
+    df_ref = pd.DataFrame(np.random.randn(100, 29), columns=cols)
+    df_curr = pd.DataFrame(np.random.randn(100, 29) + 5, columns=cols)
+    
+    # On crée un CSV temporaire car ta fonction run_drift_report lit un chemin (path)
+    ref_path = "tests/temp_reference.csv"
+    df_ref.to_csv(ref_path, index=False)
+    
+    # Appel de la fonction avec les bons types
+    drift_detected, drift_share = run_drift_report(ref_path, df_curr)
+    
+    assert isinstance(drift_detected, bool)
+    assert isinstance(drift_share, float)
+    
+    # Nettoyage
+    if os.path.exists(ref_path):
+        os.remove(ref_path)
