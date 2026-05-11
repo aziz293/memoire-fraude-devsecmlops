@@ -1,7 +1,7 @@
 import requests, time, random, numpy as np, pandas as pd
 from src.drift_detection import run_drift_report
 
-BASE_URL = "http://localhost:8080"  # ou URL Render
+BASE_URL = "https://fraud-detector-latest.onrender.com"  # ou URL Render
 TOKEN = "60d121d4123a25aa214b25959fe6cfec97623d5b"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
