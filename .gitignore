@@ -18,3 +18,9 @@ artifacts/fraud_model.pkl
 artifacts/reference_data.csv
 
 venv/
+
+test_minikube.sh
+test_monitoring.py		
+test_model_performance.py
+test_security.py
+
