@@ -19,8 +19,8 @@ artifacts/reference_data.csv
 
 venv/
 
-test_minikube.sh
-test_monitoring.py		
-test_model_performance.py
-test_security.py
+tests/test_minikube.sh
+tests/test_monitoring.py		
+tests/test_model_performance.py
+tests/test_security.py
 results/
