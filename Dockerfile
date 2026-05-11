@@ -1,6 +1,12 @@
 # Stage 1 : builder
 FROM python:3.11-slim AS builder
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip uninstall -y setuptools wheel jaraco.context && \
+    pip install --no-cache-dir setuptools>=70.0.0 wheel>=0.46.2 jaraco.context>=6.1.0
+
 WORKDIR /build
+COPY .trivyignore /
 COPY requirements.txt .
 # On installe dans un dossier neutre /install
 RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
