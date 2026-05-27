@@ -1,10 +1,9 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request  # 👈 Corrigé : Import de Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator  # 👈 Corrigé : field_validator pour Pydantic V2
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import joblib, numpy as np, os, time
 
@@ -20,8 +19,11 @@ REQUESTS = Counter("api_requests_total", "Total requests", ["endpoint", "status"
 LATENCY  = Histogram("api_latency_seconds", "Request latency", ["endpoint"])
 PREDICTIONS = Counter("predictions_total", "Predictions", ["result"])
 
-# Token d'authentification (stocker dans variable d'environnement)
-API_TOKEN = os.getenv("API_TOKEN", "changeme-in-production")
+# Détection dynamique du nom du service pour différencier Local et Render dans Grafana
+SERVICE_NAME = os.getenv("SERVICE_NAME", "fastapi-api-local")
+
+# Token d'authentification
+API_TOKEN = os.getenv("API_TOKEN", "60d121d4123a25aa214b25959fe6cfec97623d5b")
 
 def verify_token(creds: HTTPAuthorizationCredentials = Depends(security)):
     if creds.credentials != API_TOKEN:
@@ -32,7 +34,8 @@ def verify_token(creds: HTTPAuthorizationCredentials = Depends(security)):
 class TransactionFeatures(BaseModel):
     features: list[float]
 
-    @validator("features")
+    @field_validator("features")  # 👈 Corrigé : Syntaxe moderne Pydantic V2
+    @classmethod
     def validate_features(cls, v):
         if len(v) != 29:   # 30 features - Time = 29
             raise ValueError(f"Expected 29 features, got {len(v)}")
@@ -63,15 +66,14 @@ async def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-# 1. Intercepter les erreurs d'authentification ou HTTP classiques (ex: 401, 403, 404)
+# --- INTERCEPTION DES ERREURS POUR PROMETHEUS ---
+
+# 1. Erreurs d'authentification ou HTTP classiques (ex: 401, 403, 404)
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    # On incrémente Prometheus avec le VRAI code d'erreur (ex: 401)
-    api_requests_total.labels(
-        method=request.method,
+    REQUESTS.labels(
         endpoint=request.url.path,
-        status=str(exc.status_code),
-        service="fastapi-api-render" # Mets le nom correspondant à ton environnement
+        status=str(exc.status_code)
     ).inc()
     
     return JSONResponse(
@@ -79,15 +81,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         content={"detail": exc.detail},
     )
 
-# 2. Intercepter les erreurs de structure JSON / types de données (Erreur 422)
+# 2. Erreurs de validation de payload / types de données manquants (Erreur 422)
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # On incrémente Prometheus avec le code 422 obligatoire
-    api_requests_total.labels(
-        method=request.method,
+    REQUESTS.labels(
         endpoint=request.url.path,
-        status=str(status.HTTP_422_UNPROCESSABLE_ENTITY),
-        service="fastapi-api-render"
+        status=str(status.HTTP_422_UNPROCESSABLE_ENTITY)
     ).inc()
     
     return JSONResponse(
