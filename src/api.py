@@ -3,6 +3,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, validator
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import joblib, numpy as np, os, time
 
 app = FastAPI(title="Fraud Detection API", version="1.0.0",
@@ -59,3 +62,35 @@ async def health():
 async def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
+# 1. Intercepter les erreurs d'authentification ou HTTP classiques (ex: 401, 403, 404)
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # On incrémente Prometheus avec le VRAI code d'erreur (ex: 401)
+    api_requests_total.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=str(exc.status_code),
+        service="fastapi-api-render" # Mets le nom correspondant à ton environnement
+    ).inc()
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+# 2. Intercepter les erreurs de structure JSON / types de données (Erreur 422)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # On incrémente Prometheus avec le code 422 obligatoire
+    api_requests_total.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=str(status.HTTP_422_UNPROCESSABLE_ENTITY),
+        service="fastapi-api-render"
+    ).inc()
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
