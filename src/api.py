@@ -89,13 +89,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status=str(status.HTTP_422_UNPROCESSABLE_ENTITY)
     ).inc()
     
-    # 🌟 CORRECTION : On extrait les détails ou on convertit en chaînes lisibles pour le JSON
-    try:
-        errors = exc.errors()
-    except Exception:
-        errors = [{"msg": str(exc)}]
+    # 🌟 CORRECTION ROBUSTE : On extrait proprement les erreurs au format dictionnaire
+    # Si Pydantic bloque sur un objet non-sérialisable, on extrait son message brut.
+    cleaned_errors = []
+    for err in exc.errors():
+        cleaned_err = err.copy()
+        if "ctx" in cleaned_err and "error" in cleaned_err["ctx"]:
+            # On convertit l'objet ValueError/Exception interne en chaîne de caractères
+            cleaned_err["ctx"]["error"] = str(cleaned_err["ctx"]["error"])
+        cleaned_errors.append(cleaned_err)
         
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": errors},
+        content={"detail": cleaned_errors},
     )
