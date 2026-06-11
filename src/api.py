@@ -96,20 +96,20 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.post("/predict")
 async def predict(data: TransactionFeatures, request: Request, token=Depends(verify_token)):
-    # 🌟 CORRECTION 2 : 'request: Request' devient obligatoire (plus de risque de NoneType)
     x_forwarded_for = request.headers.get("x-forwarded-for")
     client_ip = x_forwarded_for.split(",")[0].strip() if x_forwarded_for else "local-environment"
 
-    # ── Validation de distribution ────────────────────────────────────────────
+    # ── Validation de distribution (Suspicious / Drift) ──────────────────────
     if is_suspicious(data.features):
         logging.warning(
             f"[SECURITY] Out-of-distribution input from {client_ip} — "
             f"first 5 features: {data.features[:5]}"
         )
         SUSPICIOUS.labels(service=SERVICE_NAME, client_ip=client_ip).inc()
+        
+        # 🌟 AJOUT : On comptabilise cette anomalie/erreur dans les prédictions
+        PREDICTIONS.labels(result="error", service=SERVICE_NAME).inc()
 
-        # 🌟 CORRECTION 1 : Statut HTTP changé en 400 (Bad Request / Anomalie de sécurité)
-        # Ainsi, Grafana verra passer une erreur et pourra dissocier l'attaque du trafic propre !
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
@@ -124,9 +124,14 @@ async def predict(data: TransactionFeatures, request: Request, token=Depends(ver
         X      = np.array(data.features).reshape(1, -1)
         proba  = float(model.predict_proba(X)[0][1])
         decision = "fraud" if proba > 0.5 else "legitimate"
+        
+        # Enregistrement du succès
         PREDICTIONS.labels(result=decision, service=SERVICE_NAME).inc()
         return {"probability": round(proba, 3), "decision": decision, "threshold": 0.5}
+        
     except Exception as e:
+        # 🌟 AJOUT : On comptabilise le crash du modèle ici
+        PREDICTIONS.labels(result="error", service=SERVICE_NAME).inc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
